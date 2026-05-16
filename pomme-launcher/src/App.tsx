@@ -3,13 +3,16 @@ import { useCallback, useEffect, useRef } from "react";
 
 import { commands, events } from "./bindings";
 import { PatchNote } from "./bindings/pomme_launcher/commands";
+import { ACTIVITY_IDLE } from "./lib/friends";
 import { useAppStateContext } from "./lib/state";
 import { handleLaunchType } from "./lib/types";
 
 import Navbar from "./components/Navbar";
 import Titlebar from "./components/Titlebar";
+import { AddFriendDialog } from "./components/dialogs/AddFriendDialog";
 import AlertDialog from "./components/dialogs/AlertDialog";
 import { ConfirmDialog } from "./components/dialogs/ConfirmDialog";
+import { FriendSettingsDialog } from "./components/dialogs/FriendSettingsDialog";
 import { InstallationDialog } from "./components/dialogs/InstallationDialog";
 import { ServerDialog } from "./components/dialogs/ServerDialog";
 
@@ -47,6 +50,7 @@ function App() {
     installations,
     setInstallations,
     setDownloadedVersions,
+    setCurrentActivity,
   } = useAppStateContext();
 
   const { setIsOpen: setAccountDropdownOpen } = accountDropdown;
@@ -173,8 +177,16 @@ function App() {
     [setDownloadedVersions],
   );
 
+  const gameRunningRef = useRef(false);
+
   const handleLaunch: handleLaunchType = useCallback(
     async ({ serverIp, serverVersion, install } = {}) => {
+      if (gameRunningRef.current) {
+        setStatus("Game already running");
+        setTimeout(() => setStatus(""), 3000);
+        return;
+      }
+
       let currentInstall = install ?? activeInstall;
       if (serverVersion && serverIp) {
         const candidate =
@@ -213,6 +225,8 @@ function App() {
       }
 
       await events.gameExitedEvent.once((event) => {
+        gameRunningRef.current = false;
+        setCurrentActivity(ACTIVITY_IDLE);
         const { code, signal, last_lines } = event.payload;
         if (code === 0) return;
         const SIGNAL_NAMES: Record<number, string> = {
@@ -250,8 +264,15 @@ function App() {
         launcherSettings.launchWithConsole ?? null,
       );
       if (res.ok) {
+        gameRunningRef.current = true;
+        setCurrentActivity(
+          serverIp
+            ? { status: "PLAYING_SERVER", joinInfo: { value: serverIp, invited: false } }
+            : { status: "PLAYING_OFFLINE", joinInfo: null },
+        );
         setStatus(res.value);
       } else {
+        setCurrentActivity(ACTIVITY_IDLE);
         setStatus(res.error);
       }
       setDownloadProgress(null);
@@ -267,6 +288,7 @@ function App() {
       setStatus,
       setDownloadProgress,
       setOpenedDialog,
+      setCurrentActivity,
       account?.uuid,
       launcherSettings.launchWithConsole,
     ],
@@ -313,7 +335,7 @@ function App() {
 
           {page === "servers" && <ServersPage handleLaunch={handleLaunch} />}
 
-          {page === "friends" && <FriendsPage />}
+          {page === "friends" && <FriendsPage handleLaunch={handleLaunch} />}
 
           {page === "mods" && <ModsPage />}
 
@@ -339,6 +361,10 @@ function App() {
           {openedDialog.name === "server_dialog" && <ServerDialog {...openedDialog.props} />}
           {openedDialog.name === "confirm_dialog" && <ConfirmDialog {...openedDialog.props} />}
           {openedDialog.name === "alert_dialog" && <AlertDialog {...openedDialog.props} />}
+          {openedDialog.name === "add_friend_dialog" && <AddFriendDialog {...openedDialog.props} />}
+          {openedDialog.name === "friend_settings_dialog" && (
+            <FriendSettingsDialog {...openedDialog.props} />
+          )}
         </div>
       )}
     </div>

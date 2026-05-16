@@ -2,11 +2,13 @@ use std::collections::VecDeque;
 #[cfg(unix)]
 use std::os::unix::process::ExitStatusExt;
 use std::process::Stdio;
+use std::sync::LazyLock;
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use tauri_specta::Event;
 use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::sync::Mutex;
 
 use crate::installations::{Installation, InstallationDraft, InstallationError};
 use crate::settings::LauncherSettings;
@@ -261,6 +263,86 @@ pub async fn refresh_account(uuid: String) -> Result<crate::auth::AuthAccount, S
     crate::auth::try_restore_or_refresh(&uuid)
         .await
         .ok_or_else(|| "Failed to refresh account".to_string())
+}
+
+static TOKEN_REFRESH_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+
+async fn fresh_token(uuid: &str) -> Result<String, String> {
+    let _guard = TOKEN_REFRESH_LOCK.lock().await;
+    crate::auth::try_restore_or_refresh(uuid)
+        .await
+        .map(|a| a.access_token)
+        .ok_or_else(|| "Account is not signed in".to_string())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn get_friends(
+    uuid: String,
+) -> Result<crate::friends::FriendsList, crate::friends::FriendsApiError> {
+    let token = fresh_token(&uuid).await?;
+    crate::friends::get_friends(&token).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn send_friend_request(
+    uuid: String,
+    name: String,
+) -> Result<crate::friends::FriendsList, crate::friends::FriendsApiError> {
+    let token = fresh_token(&uuid).await?;
+    crate::friends::action_by_name(&token, &name, crate::friends::UpdateType::Add).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn accept_friend_request(
+    uuid: String,
+    friend_uuid: String,
+) -> Result<crate::friends::FriendsList, crate::friends::FriendsApiError> {
+    let token = fresh_token(&uuid).await?;
+    crate::friends::action_by_id(&token, &friend_uuid, crate::friends::UpdateType::Add).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn remove_friend(
+    uuid: String,
+    friend_uuid: String,
+) -> Result<crate::friends::FriendsList, crate::friends::FriendsApiError> {
+    let token = fresh_token(&uuid).await?;
+    crate::friends::action_by_id(&token, &friend_uuid, crate::friends::UpdateType::Remove).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn update_presence(
+    uuid: String,
+    status: String,
+    join_info: Option<crate::friends::PresenceJoinInfo>,
+) -> Result<Vec<crate::friends::PresenceEntry>, crate::friends::FriendsApiError> {
+    let token = fresh_token(&uuid).await?;
+    crate::friends::update_presence(&token, &status, join_info.as_ref()).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn get_friend_settings(
+    uuid: String,
+) -> Result<crate::friends::FriendSettings, crate::friends::FriendsApiError> {
+    let token = fresh_token(&uuid).await?;
+    crate::friends::get_friend_settings(&token).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn update_friend_settings(
+    uuid: String,
+    show_in_list: bool,
+    accept_invites: bool,
+) -> Result<crate::friends::FriendSettings, crate::friends::FriendsApiError> {
+    let token = fresh_token(&uuid).await?;
+    crate::friends::update_friend_settings(&token, show_in_list, accept_invites).await
 }
 
 #[tauri::command]
