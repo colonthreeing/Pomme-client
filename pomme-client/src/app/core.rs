@@ -76,6 +76,7 @@ pub struct AppCore {
     pub resource_packs: ResourcePackManager,
     pub pending_pack_download: Option<PendingPackDownload>,
     pub asset_index: Option<AssetIndex>,
+    pub audio: crate::audio::AudioEngine,
     pub tick_accumulator: f32,
     pub time_tick_accumulator: f32,
 }
@@ -99,6 +100,12 @@ impl AppCore {
         let asset_index =
             AssetIndex::load(&data_dirs.indexes_dir, &data_dirs.objects_dir, &version);
 
+        let audio = crate::audio::AudioEngine::new(
+            &data_dirs.jar_assets_dir,
+            asset_index.clone(),
+            menu.category_volumes(),
+        );
+
         Self {
             user,
             presence,
@@ -111,6 +118,7 @@ impl AppCore {
             resource_packs,
             pending_pack_download: None,
             asset_index,
+            audio,
             tick_accumulator: 0.0,
             time_tick_accumulator: 0.0,
         }
@@ -454,6 +462,50 @@ impl AppCore {
                     // Action 1 for chest/shulker = open-viewer count.
                     if action_id == 1 {
                         game.block_entity_anim.set_open_count(pos, action_parameter);
+                    }
+                }
+                NetworkEvent::PlaySound {
+                    sound,
+                    category,
+                    x,
+                    y,
+                    z,
+                    volume,
+                    pitch,
+                    seed,
+                } => {
+                    self.audio.play_world_sound(
+                        &sound,
+                        category,
+                        [x as f32, y as f32, z as f32],
+                        volume,
+                        pitch,
+                        seed,
+                    );
+                }
+                NetworkEvent::PlayEntitySound {
+                    sound,
+                    category,
+                    entity_id,
+                    volume,
+                    pitch,
+                    seed,
+                } => {
+                    let pos = if entity_id == game.player.entity_id {
+                        let p = game.player.position;
+                        Some([p.x, p.y + 1.0, p.z])
+                    } else {
+                        game.entity_store.living.get(&entity_id).map(|e| {
+                            [
+                                e.position.x as f32,
+                                e.position.y as f32,
+                                e.position.z as f32,
+                            ]
+                        })
+                    };
+                    if let Some(pos) = pos {
+                        self.audio
+                            .play_world_sound(&sound, category, pos, volume, pitch, seed);
                     }
                 }
                 NetworkEvent::GameModeChanged { game_mode } => {
