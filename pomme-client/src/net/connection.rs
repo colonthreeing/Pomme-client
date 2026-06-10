@@ -121,7 +121,14 @@ pub async fn connect_to_server(
     })
     .await?;
 
-    tracing::info!("Sent login hello as {}", args.username);
+    tracing::info!("Sent login hello as {} ({})", args.username, args.uuid);
+    if args.access_token.is_none() {
+        tracing::warn!(
+            "Connecting offline (no access token). The server keys op/permissions to the \
+             authenticated account, so op-only commands like /time may return \"Unknown command\" \
+             under this offline identity."
+        );
+    }
 
     login_sequence(&mut conn, &args).await?;
 
@@ -449,6 +456,9 @@ async fn game_loop(
 
     let sender = PacketSender::new(outbound_tx.clone());
 
+    let shared_tree: crate::net::commands::SharedCommandTree =
+        std::sync::Arc::new(parking_lot::Mutex::new(None));
+
     tokio::spawn(async move {
         while let Some(packet) = outbound_rx.recv().await {
             if let Err(e) = writer.write(packet).await {
@@ -459,16 +469,34 @@ async fn game_loop(
     });
 
     let chat_outbound_tx = outbound_tx;
+    let chat_tree = shared_tree.clone();
     tokio::spawn(async move {
+        // TODO: secure chat session + signing for enforce-secure-profile=true servers.
+        // When access_token is set, fetch profile certs
+        // (azalea_auth::certs::fetch_certificates),
+        // send ServerboundChatSessionUpdate, then sign chat and signable-arg commands
+        // (ServerboundChatCommandSigned) with azalea_crypto signing (needs the
+        // "signing" feature). Everything is sent unsigned atm, which only
+        // works on enforce-secure-profile=false.
         while let Ok(msg) = tokio::task::block_in_place(|| chat_rx.recv()) {
             let packet = if let Some(command) = msg.strip_prefix('/') {
+                tracing::info!("Sending command: {command:?}");
+                let signable = chat_tree
+                    .lock()
+                    .as_ref()
+                    .map(|tree| tree.has_signable_args(command))
+                    .unwrap_or(false);
+                if signable {
+                    tracing::warn!(
+                        "Command has signable arguments but chat signing is not implemented; sending unsigned"
+                    );
+                }
                 ServerboundGamePacket::ChatCommand(
                     azalea_protocol::packets::game::s_chat_command::ServerboundChatCommand {
                         command: command.to_string(),
                     },
                 )
             } else {
-                // TODO: implement chat signing - requires enforce-secure-profile=false for now
                 ServerboundGamePacket::Chat(
                     azalea_protocol::packets::game::s_chat::ServerboundChat {
                         message: msg,
@@ -490,7 +518,9 @@ async fn game_loop(
 
     loop {
         match reader.read().await {
-            Ok(packet) => handle_game_packet(&packet, &sender, event_tx, &registry_holder),
+            Ok(packet) => {
+                handle_game_packet(&packet, &sender, event_tx, &registry_holder, &shared_tree)
+            }
             Err(e) if is_recoverable_read_error(&e) => {
                 tracing::warn!("Skipping malformed packet: {e}");
             }
