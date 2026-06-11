@@ -1,7 +1,9 @@
 use std::collections::HashSet;
+use std::f64::EPSILON;
 
 use winit::event::{ElementState, Modifiers, MouseButton};
 use winit::keyboard::{KeyCode, PhysicalKey};
+use gilrs::{Button, Event, Gamepad, GamepadId, Gilrs};
 
 pub struct InputState {
     pressed: HashSet<KeyCode>,
@@ -24,6 +26,8 @@ pub struct InputState {
     copy_pressed: bool,
     cut_pressed: bool,
     undo_pressed: bool,
+    controller_manager: Gilrs,
+    active_gamepad_id: Option<GamepadId>
 }
 
 #[derive(Default)]
@@ -56,7 +60,54 @@ impl InputState {
             copy_pressed: false,
             cut_pressed: false,
             undo_pressed: false,
+            controller_manager: Gilrs::new().unwrap(),
+            active_gamepad_id: None,
         }
+    }
+
+
+    pub fn update_controller(&mut self) {
+        while let Some(event) = self.controller_manager.next_event() {
+            self.on_gamepad_event(&event);
+        }
+    }
+
+    pub fn on_gamepad_event(&mut self, event: &gilrs::Event) {
+        self.active_gamepad_id = Some(event.id);
+    }
+
+    pub fn get_gamepad_left_analog(&self) -> Option<glam::Vec2> {
+        if let Some(gamepad) = self.active_gamepad_id.map(|id| self.controller_manager.gamepad(id)) {
+            let desired = glam::vec2(
+                gamepad.axis_data(gilrs::Axis::LeftStickX).map(|data| { data.value() }).unwrap_or(0f32),
+                gamepad.axis_data(gilrs::Axis::LeftStickY).map(|data| { data.value() }).unwrap_or(0f32)
+            ).clamp_length_max(1.0);
+
+            if desired.length() < 1E-1 {
+                return None; // Some(glam::Vec2::ZERO)
+            }
+
+            return Some(desired);
+        }
+
+        None
+    }
+
+        pub fn get_gamepad_right_analog(&self) -> Option<glam::Vec2> {
+        if let Some(gamepad) = self.active_gamepad_id.map(|id| self.controller_manager.gamepad(id)) {
+            let desired = glam::vec2(
+                gamepad.axis_data(gilrs::Axis::RightStickX).map(|data| { data.value() }).unwrap_or(0f32),
+                gamepad.axis_data(gilrs::Axis::RightStickY).map(|data| { data.value() }).unwrap_or(0f32)
+            ).clamp_length_max(1.0);
+
+            if desired.length() < 1E-1 {
+                return None; // Some(glam::Vec2::ZERO)
+            }
+
+            return Some(desired);
+        }
+
+        None
     }
 
     pub fn key_pressed(&self, key: KeyCode) -> bool {

@@ -403,6 +403,10 @@ impl ApplicationHandler for App {
                 };
 
                 let core = &mut self.core;
+
+                // Handle Gilrs controller updates before main update
+                core.input.update_controller();
+
                 self.phase.transition(|app| match app {
                     AppPhase::Setup { .. } => unreachable!(
                         "The function early returns above if the phase is AppPhase::Setup"

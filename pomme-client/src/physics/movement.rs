@@ -274,18 +274,24 @@ fn movement_input(input: &InputState) -> (f64, f64) {
     let mut forward = 0.0f64;
     let mut strafe = 0.0f64;
 
-    if input.key_pressed(KeyCode::KeyW) {
-        forward += 1.0;
+    if let Some(analog_input) = input.get_gamepad_left_analog() {
+        forward = analog_input.y as f64;
+        strafe = analog_input.x as f64;
+    } else {
+        if input.key_pressed(KeyCode::KeyW) {
+            forward += 1.0;
+        }
+        if input.key_pressed(KeyCode::KeyS) {
+            forward -= 1.0;
+        }
+        if input.key_pressed(KeyCode::KeyA) {
+            strafe -= 1.0;
+        }
+        if input.key_pressed(KeyCode::KeyD) {
+            strafe += 1.0;
+        }
     }
-    if input.key_pressed(KeyCode::KeyS) {
-        forward -= 1.0;
-    }
-    if input.key_pressed(KeyCode::KeyA) {
-        strafe -= 1.0;
-    }
-    if input.key_pressed(KeyCode::KeyD) {
-        strafe += 1.0;
-    }
+
 
     forward *= INPUT_DAMPING;
     strafe *= INPUT_DAMPING;
