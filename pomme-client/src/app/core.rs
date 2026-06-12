@@ -863,14 +863,17 @@ impl AppCore {
 
     fn send_input_packet(&mut self, connection: &ConnectionHandle, game: &mut GameState) {
         let sender = &connection.packet_tx;
-        
-        let analog_move = self.input.get_gamepad_left_analog().unwrap_or(glam::Vec2::ZERO);
+
+        let analog_move = self
+            .input
+            .get_gamepad_left_analog()
+            .unwrap_or(glam::Vec2::ZERO);
 
         let current = PlayerInputState {
-            forward: self.input.key_pressed(KeyCode::KeyW)  || analog_move.y > 0.25,
+            forward: self.input.key_pressed(KeyCode::KeyW) || analog_move.y > 0.25,
             backward: self.input.key_pressed(KeyCode::KeyS) || analog_move.y < -0.25,
-            left: self.input.key_pressed(KeyCode::KeyA)     || analog_move.x > 0.25,
-            right: self.input.key_pressed(KeyCode::KeyD)    || analog_move.x < -0.25,
+            left: self.input.key_pressed(KeyCode::KeyA) || analog_move.x > 0.25,
+            right: self.input.key_pressed(KeyCode::KeyD) || analog_move.x < -0.25,
             jump: self.input.performing_action(Action::Jump),
             shift: self.input.performing_action(Action::Sneak),
             sprint: game.player.sprinting,

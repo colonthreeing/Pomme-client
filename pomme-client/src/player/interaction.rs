@@ -157,7 +157,7 @@ impl InteractionState {
             );
         }
 
-        if input.action_just_pressed(input::Action::Destroy) {
+        if input.performing_action(input::Action::Destroy) {
             self.continue_attack(
                 chunks,
                 sender,
@@ -171,7 +171,9 @@ impl InteractionState {
             self.stop_destroying(sender);
         }
 
-        if input.action_just_pressed(input::Action::Use) || (input.performing_action(input::Action::Use) && self.use_delay == 0) {
+        if input.action_just_pressed(input::Action::Use)
+            || (input.performing_action(input::Action::Use) && self.use_delay == 0)
+        {
             self.use_item_on(sender);
         }
 

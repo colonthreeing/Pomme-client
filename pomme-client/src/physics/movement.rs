@@ -40,7 +40,11 @@ pub fn tick(player: &mut LocalPlayer, input: &InputState, chunk_store: &ChunkSto
     player.update_water_state(chunk_store);
 
     let (forward, strafe) = movement_input(input);
-    let forward_pressed = input.key_pressed(KeyCode::KeyW) || input.get_gamepad_left_analog().map(|vec| { vec.y > 0.25}).unwrap_or(false);
+    let forward_pressed = input.key_pressed(KeyCode::KeyW)
+        || input
+            .get_gamepad_left_analog()
+            .map(|vec| vec.y > 0.25)
+            .unwrap_or(false);
 
     update_sprint_state(player, input, forward, forward_pressed);
 
@@ -291,7 +295,6 @@ fn movement_input(input: &InputState) -> (f64, f64) {
             strafe += 1.0;
         }
     }
-
 
     forward *= INPUT_DAMPING;
     strafe *= INPUT_DAMPING;

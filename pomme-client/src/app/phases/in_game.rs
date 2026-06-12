@@ -9,7 +9,7 @@ use glam::FloatExt as _;
 
 use crate::app::core::{AppCore, PlayerInputState};
 use crate::app::phases::Gfx;
-use crate::app::{DEFAULT_RENDER_DISTANCE, TICK_RATE};
+use crate::app::{DEFAULT_RENDER_DISTANCE, TICK_RATE, input};
 use crate::benchmark::{Benchmark, BenchmarkResult};
 use crate::entity::components::{LookDirection, Position};
 use crate::entity::{EntityStore, ItemEntityStore, lerp_angle};
@@ -328,7 +328,7 @@ pub fn update_game(
         core.menu.gui_scale_setting,
     );
 
-    if core.input.tab_held()
+    if core.input.performing_action(input::Action::ViewPlayerList)
         && !game.paused
         && !game.gui_open()
         && !game.chat.is_open()

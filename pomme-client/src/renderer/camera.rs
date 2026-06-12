@@ -59,10 +59,11 @@ impl Camera {
 
     pub fn update_look(&mut self, input: &mut InputState) {
         if let Some(look_vec) = input.get_gamepad_right_analog() {
-            let y_rot_deg = ((self.look_dir.y_rot_deg() + look_vec.x as f32 * CONTROLLER_SENSITIVITY) + 180.0)
+            let y_rot_deg = ((self.look_dir.y_rot_deg() + look_vec.x * CONTROLLER_SENSITIVITY)
+                + 180.0)
                 .rem_euclid(360.0)
                 - 180.0;
-            let x_rot_deg = self.look_dir.x_rot_deg() + look_vec.y as f32 * CONTROLLER_SENSITIVITY * -1.0; //TODO: Add preference for whether to multiply by -1 or not
+            let x_rot_deg = self.look_dir.x_rot_deg() + -(look_vec.y * CONTROLLER_SENSITIVITY); //TODO: Add preference for whether to multiply by -1 or not
             self.look_dir = LookDirection::new(y_rot_deg, x_rot_deg);
         }
 
