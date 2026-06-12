@@ -405,7 +405,7 @@ impl ApplicationHandler for App {
                 let core = &mut self.core;
 
                 // Handle Gilrs controller updates before main update
-                core.input.update_controller();
+                core.input.update();
 
                 self.phase.transition(|app| match app {
                     AppPhase::Setup { .. } => unreachable!(

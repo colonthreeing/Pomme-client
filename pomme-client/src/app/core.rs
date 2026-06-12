@@ -857,7 +857,7 @@ impl AppCore {
                 game.mesh_dispatcher.enqueue(&game.chunk_store, pos, 0);
             }
 
-            self.input.clear_click_events();
+            self.input.clear_just_pressed_actions();
         }
     }
 
